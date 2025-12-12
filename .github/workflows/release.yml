@@ -1,0 +1,150 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Platform to build'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - macos-latest
+          - windows-latest
+      create_release:
+        description: 'Create a new release'
+        required: false
+        default: true
+        type: boolean
+
+jobs:
+  get-latest-tag:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    outputs:
+      latest_tag: ${{ steps.get_tag.outputs.tag }}
+      release_id: ${{ steps.get_release.outputs.release_id }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Get latest tag
+        id: get_tag
+        run: |
+          latest_tag=$(git describe --tags --abbrev=0)
+          echo "tag=$latest_tag" >> $GITHUB_OUTPUT
+          echo "Latest tag: $latest_tag"
+      - name: Get existing release
+        id: get_release
+        run: |
+          release_id=$(gh release view ${{ steps.get_tag.outputs.tag }} --json id --jq '.id')
+          echo "release_id=$release_id" >> $GITHUB_OUTPUT
+          echo "Release ID: $release_id"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  create-release:
+    if: github.event_name == 'push'
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.create_release.outputs.id }}
+    steps:
+      - name: Create release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ format('App Version GUI {0}', github.ref_name) }}
+          body: 'See the assets to download and install this version.'
+          draft: false
+          prerelease: false
+
+  release:
+    needs: [create-release, get-latest-tag]
+    if: always() && (needs.create-release.result == 'success' || needs.create-release.result == 'skipped' || needs.get-latest-tag.result == 'success')
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: ${{ github.event_name == 'workflow_dispatch' && inputs.platform != 'all' && fromJSON(format('["{0}"]', inputs.platform)) || fromJSON('["macos-latest", "windows-latest"]') }}
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies (macOS only)
+        if: matrix.platform == 'macos-latest'
+        run: |
+          rustup target add aarch64-apple-darwin
+          rustup target add x86_64-apple-darwin
+
+      - name: Install dependencies (Windows only)
+        if: matrix.platform == 'windows-latest'
+        run: |
+          rustup target add x86_64-pc-windows-msvc
+
+      - name: Rust setup
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Sync node version and setup cache
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+
+      - name: Install pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@latest --activate
+
+      - name: Install frontend dependencies
+        run: pnpm install
+
+      - name: Build the app (macOS Apple Silicon)
+        if: matrix.platform == 'macos-latest'
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          releaseId: ${{ github.event_name == 'workflow_dispatch' && needs.get-latest-tag.outputs.release_id || needs.create-release.outputs.release_id }}
+          args: --target aarch64-apple-darwin
+
+      - name: Build the app (macOS Intel)
+        if: matrix.platform == 'macos-latest'
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          releaseId: ${{ github.event_name == 'workflow_dispatch' && needs.get-latest-tag.outputs.release_id || needs.create-release.outputs.release_id }}
+          args: --target x86_64-apple-darwin
+
+      - name: Build the app (Windows)
+        if: matrix.platform == 'windows-latest'
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          releaseId: ${{ github.event_name == 'workflow_dispatch' && needs.get-latest-tag.outputs.release_id || needs.create-release.outputs.release_id }}
+          args: --target x86_64-pc-windows-msvc
