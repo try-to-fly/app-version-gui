@@ -30,12 +30,53 @@ export function AddSoftwareDialog({
   onOpenChange,
   onSubmit,
 }: AddSoftwareDialogProps) {
+  const [url, setUrl] = useState("");
   const [name, setName] = useState("");
   const [sourceType, setSourceType] = useState<SourceType>("github-release");
   const [identifier, setIdentifier] = useState("");
   const [localCommand, setLocalCommand] = useState("");
   const [versionArg, setVersionArg] = useState("--version");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // 解析 GitHub URL
+  const parseGitHubUrl = (inputUrl: string) => {
+    const trimmedUrl = inputUrl.trim();
+
+    // 匹配 GitHub URL 格式: https://github.com/owner/repo[/releases|/tags|...]
+    const githubUrlPattern = /^https?:\/\/github\.com\/([^/]+)\/([^/]+?)(?:\/(?:releases|tags|issues|pulls|actions|tree|blob|commit|compare|wiki|pulse|graphs|network|settings).*)?(?:\.git)?$/i;
+    const match = trimmedUrl.match(githubUrlPattern);
+
+    if (match) {
+      const owner = match[1];
+      const repo = match[2].replace(/\.git$/, '');
+      const repoIdentifier = `${owner}/${repo}`;
+
+      // 根据 URL 路径判断数据源类型
+      if (trimmedUrl.includes('/tags')) {
+        setSourceType('github-tags');
+      } else {
+        setSourceType('github-release');
+      }
+
+      // 设置标识符
+      setIdentifier(repoIdentifier);
+
+      // 设置默认名称（如果名称为空）
+      if (!name) {
+        setName(repo);
+      }
+
+      return true;
+    }
+
+    return false;
+  };
+
+  // 处理 URL 输入变化
+  const handleUrlChange = (value: string) => {
+    setUrl(value);
+    parseGitHubUrl(value);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,6 +109,7 @@ export function AddSoftwareDialog({
   };
 
   const resetForm = () => {
+    setUrl("");
     setName("");
     setSourceType("github-release");
     setIdentifier("");
@@ -87,7 +129,7 @@ export function AddSoftwareDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px] max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>添加软件</DialogTitle>
           <DialogDescription>
@@ -96,6 +138,19 @@ export function AddSoftwareDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="url">GitHub URL（可选）</Label>
+            <Input
+              id="url"
+              value={url}
+              onChange={(e) => handleUrlChange(e.target.value)}
+              placeholder="粘贴 GitHub 链接自动填充，如 https://github.com/owner/repo"
+            />
+            <p className="text-xs text-muted-foreground">
+              输入 GitHub 链接可自动解析名称和标识符
+            </p>
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="name">名称</Label>
             <Input

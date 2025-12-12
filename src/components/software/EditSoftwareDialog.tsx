@@ -90,7 +90,7 @@ export function EditSoftwareDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px] max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>编辑软件</DialogTitle>
           <DialogDescription>修改软件的追踪配置。</DialogDescription>
