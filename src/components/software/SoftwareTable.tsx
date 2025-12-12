@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { RefreshCw, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import {
   Table,
@@ -14,6 +15,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { VersionBadge } from "./VersionBadge";
 import { fromNow } from "@/lib/time";
 import type { Software } from "@/types/software";
@@ -34,6 +43,19 @@ export function SoftwareTable({
   onDelete,
   isRefreshing,
 }: SoftwareTableProps) {
+  const [deleteTarget, setDeleteTarget] = useState<Software | null>(null);
+
+  const handleDeleteClick = (software: Software) => {
+    setDeleteTarget(software);
+  };
+
+  const handleConfirmDelete = () => {
+    if (deleteTarget) {
+      onDelete(deleteTarget.id);
+      setDeleteTarget(null);
+    }
+  };
+
   if (softwares.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
@@ -44,6 +66,7 @@ export function SoftwareTable({
   }
 
   return (
+    <>
     <Table>
       <TableHeader>
         <TableRow>
@@ -105,7 +128,7 @@ export function SoftwareTable({
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         className="text-destructive"
-                        onClick={() => onDelete(software.id)}
+                        onClick={() => handleDeleteClick(software)}
                       >
                         <Trash2 className="h-4 w-4 mr-2" />
                         删除
@@ -119,5 +142,25 @@ export function SoftwareTable({
         })}
       </TableBody>
     </Table>
+
+    <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>确认删除</DialogTitle>
+          <DialogDescription>
+            确定要删除「{deleteTarget?.name}」吗？此操作无法撤销。
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+            取消
+          </Button>
+          <Button variant="destructive" onClick={handleConfirmDelete}>
+            删除
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

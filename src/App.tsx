@@ -118,8 +118,6 @@ function App() {
       const software = softwares.find((s) => s.id === id);
       if (!software) return;
 
-      if (!window.confirm(`确定要删除 "${software.name}" 吗？`)) return;
-
       try {
         await deleteSoftware(id);
         toast.success("删除成功", { description: `已删除 ${software.name}` });
