@@ -1,12 +1,13 @@
 use chrono::{DateTime, Utc};
 use std::sync::Arc;
-use tauri::State;
+use tauri::{AppHandle, State};
 use tokio::sync::Semaphore;
 use uuid::Uuid;
 
 use crate::cache::CacheState;
 use crate::database::DbState;
 use crate::models::{AppSettings, Software, SoftwareFormData, SourceType, VersionCheckResult};
+use crate::scheduler::SchedulerState;
 use crate::services::{cargo, github, homebrew, local_version, npm, pypi};
 use crate::version::comparator;
 
@@ -394,4 +395,26 @@ fn get_local_version(software: &Software) -> Option<String> {
     software.local_version_config.as_ref().and_then(|config| {
         local_version::get_version(&config.command, config.version_arg.as_deref()).ok()
     })
+}
+
+// Scheduler Commands
+
+#[tauri::command]
+pub async fn update_scheduler(
+    enabled: bool,
+    interval_minutes: u32,
+    scheduler: State<'_, SchedulerState>,
+    app_handle: AppHandle,
+) -> Result<(), String> {
+    let mut scheduler = scheduler.lock().await;
+
+    if enabled && interval_minutes > 0 {
+        scheduler.restart(interval_minutes, app_handle);
+        println!("[Scheduler] Updated: enabled with {} minute interval", interval_minutes);
+    } else {
+        scheduler.stop();
+        println!("[Scheduler] Updated: disabled");
+    }
+
+    Ok(())
 }

@@ -1,4 +1,4 @@
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use tauri::Manager;
 
 mod cache;
@@ -6,12 +6,14 @@ mod commands;
 mod database;
 mod models;
 mod notification;
+mod scheduler;
 mod services;
 mod version;
 
 use cache::CacheManager;
 use database::Database;
 use models::AppSettings;
+use scheduler::{BackgroundScheduler, SchedulerState};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -38,9 +40,25 @@ pub fn run() {
             // Initialize cache with TTL from settings
             let cache = CacheManager::new(settings.cache.ttl_minutes as i64);
 
+            // Initialize scheduler
+            let scheduler: SchedulerState = Arc::new(tokio::sync::Mutex::new(BackgroundScheduler::new()));
+
             app.manage(Mutex::new(db));
             app.manage(cache);
-            app.manage(settings);
+            app.manage(settings.clone());
+            app.manage(scheduler.clone());
+
+            // Start scheduler if auto-refresh is enabled
+            if settings.cache.auto_refresh_enabled && settings.cache.auto_refresh_interval > 0 {
+                let app_handle = app.handle().clone();
+                let scheduler_clone = scheduler.clone();
+                let interval = settings.cache.auto_refresh_interval;
+
+                tauri::async_runtime::spawn(async move {
+                    let mut scheduler = scheduler_clone.lock().await;
+                    scheduler.start(interval, app_handle);
+                });
+            }
 
             Ok(())
         })
@@ -55,6 +73,7 @@ pub fn run() {
             commands::clear_cache,
             commands::get_settings,
             commands::save_settings,
+            commands::update_scheduler,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

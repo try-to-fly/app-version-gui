@@ -1,4 +1,5 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { listen } from "@tauri-apps/api/event";
 import { Header } from "@/components/layout/Header";
 import { SoftwareTable } from "@/components/software/SoftwareTable";
 import { AddSoftwareDialog } from "@/components/software/AddSoftwareDialog";
@@ -8,7 +9,7 @@ import { Toaster, toast } from "@/components/ui/sonner";
 import { useSoftwareStore } from "@/stores/softwareStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { fromNow } from "@/lib/time";
-import type { Software, SoftwareFormData } from "@/types/software";
+import type { Software, SoftwareFormData, VersionCheckResult } from "@/types/software";
 
 function App() {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -36,8 +37,6 @@ function App() {
     clearCache,
   } = useSettingsStore();
 
-  const autoRefreshRef = useRef<number | null>(null);
-
   // Apply theme mode
   useEffect(() => {
     const applyTheme = (mode: "light" | "dark") => {
@@ -64,21 +63,19 @@ function App() {
     fetchSettings();
   }, [fetchSoftwares, fetchSettings]);
 
-  // Auto refresh
+  // Listen for backend scheduler updates
   useEffect(() => {
-    if (settings.cache.autoRefreshEnabled && settings.cache.autoRefreshInterval > 0) {
-      const interval = settings.cache.autoRefreshInterval * 60 * 1000;
-      autoRefreshRef.current = window.setInterval(() => {
-        checkAllVersions().catch(console.error);
-      }, interval);
+    const unlisten = listen<VersionCheckResult[]>("versions-updated", (event) => {
+      console.log("[Scheduler] Received version update from backend", event.payload);
+      // 刷新软件列表以获取最新数据
+      fetchSoftwares();
+      toast.success("自动刷新完成", { description: `已更新 ${event.payload.length} 个软件版本信息` });
+    });
 
-      return () => {
-        if (autoRefreshRef.current) {
-          clearInterval(autoRefreshRef.current);
-        }
-      };
-    }
-  }, [settings.cache.autoRefreshEnabled, settings.cache.autoRefreshInterval, checkAllVersions]);
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, [fetchSoftwares]);
 
   const handleAddSoftware = useCallback(
     async (form: SoftwareFormData) => {

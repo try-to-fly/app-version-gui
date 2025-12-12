@@ -45,6 +45,11 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   saveSettings: async (settings) => {
     try {
       await invoke("save_settings", { newSettings: settings });
+      // 更新后端调度器
+      await invoke("update_scheduler", {
+        enabled: settings.cache.autoRefreshEnabled,
+        intervalMinutes: settings.cache.autoRefreshInterval,
+      });
       set({ settings });
     } catch (error) {
       set({ error: String(error) });
