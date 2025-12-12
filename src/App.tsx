@@ -38,10 +38,25 @@ function App() {
 
   const autoRefreshRef = useRef<number | null>(null);
 
-  // Apply theme color
+  // Apply theme mode
   useEffect(() => {
-    document.documentElement.setAttribute("data-theme", settings.themeColor);
-  }, [settings.themeColor]);
+    const applyTheme = (mode: "light" | "dark") => {
+      document.documentElement.classList.remove("light", "dark");
+      document.documentElement.classList.add(mode);
+    };
+
+    if (settings.theme === "system") {
+      const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+      const handleChange = (e: MediaQueryListEvent | MediaQueryList) => {
+        applyTheme(e.matches ? "dark" : "light");
+      };
+      handleChange(mediaQuery);
+      mediaQuery.addEventListener("change", handleChange);
+      return () => mediaQuery.removeEventListener("change", handleChange);
+    } else {
+      applyTheme(settings.theme);
+    }
+  }, [settings.theme]);
 
   // Initial data fetch
   useEffect(() => {
