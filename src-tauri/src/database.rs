@@ -3,7 +3,7 @@ use rusqlite::{params, Connection, Result};
 use std::path::Path;
 use std::sync::Mutex;
 
-use crate::models::{AppSettings, CacheConfig, LocalVersionConfig, Software, SourceConfig, SourceType, ThemeMode};
+use crate::models::{AppSettings, LocalVersionConfig, NotificationConfig, Software, SourceConfig, SourceType, ThemeMode};
 
 pub struct Database {
     conn: Connection,
@@ -43,13 +43,41 @@ impl Database {
             [],
         )?;
 
+        // 数据库迁移：添加通知相关字段
+        self.migrate_add_notification_fields()?;
+
+        Ok(())
+    }
+
+    /// 数据库迁移：添加通知相关字段
+    fn migrate_add_notification_fields(&self) -> Result<()> {
+        // 检查 last_notified_version 列是否存在
+        let column_exists: bool = self.conn.query_row(
+            "SELECT COUNT(*) FROM pragma_table_info('softwares') WHERE name='last_notified_version'",
+            [],
+            |row| row.get::<_, i32>(0).map(|count| count > 0),
+        )?;
+
+        if !column_exists {
+            // 添加新列
+            self.conn.execute(
+                "ALTER TABLE softwares ADD COLUMN last_notified_version TEXT",
+                [],
+            )?;
+            self.conn.execute(
+                "ALTER TABLE softwares ADD COLUMN last_notified_at TEXT",
+                [],
+            )?;
+        }
+
         Ok(())
     }
 
     pub fn get_all_softwares(&self) -> Result<Vec<Software>> {
         let mut stmt = self.conn.prepare(
             "SELECT id, name, source_type, source_identifier, local_command, local_version_arg,
-                    latest_version, local_version, published_at, last_checked_at, enabled
+                    latest_version, local_version, published_at, last_checked_at, enabled,
+                    last_notified_version, last_notified_at
              FROM softwares ORDER BY name"
         )?;
 
@@ -73,6 +101,10 @@ impl Database {
             let last_checked_at = last_checked_at_str.and_then(|s| DateTime::parse_from_rfc3339(&s).ok())
                 .map(|dt| dt.with_timezone(&Utc));
 
+            let last_notified_at_str: Option<String> = row.get(12)?;
+            let last_notified_at = last_notified_at_str.and_then(|s| DateTime::parse_from_rfc3339(&s).ok())
+                .map(|dt| dt.with_timezone(&Utc));
+
             Ok(Software {
                 id: row.get(0)?,
                 name: row.get(1)?,
@@ -86,6 +118,8 @@ impl Database {
                 published_at,
                 last_checked_at,
                 enabled: row.get::<_, i32>(10)? != 0,
+                last_notified_version: row.get(11)?,
+                last_notified_at,
             })
         })?;
 
@@ -100,8 +134,9 @@ impl Database {
     pub fn insert_software(&self, software: &Software) -> Result<()> {
         self.conn.execute(
             "INSERT INTO softwares (id, name, source_type, source_identifier, local_command,
-             local_version_arg, latest_version, local_version, published_at, last_checked_at, enabled)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+             local_version_arg, latest_version, local_version, published_at, last_checked_at, enabled,
+             last_notified_version, last_notified_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
             params![
                 software.id,
                 software.name,
@@ -114,6 +149,8 @@ impl Database {
                 software.published_at.map(|dt| dt.to_rfc3339()),
                 software.last_checked_at.map(|dt| dt.to_rfc3339()),
                 software.enabled as i32,
+                software.last_notified_version,
+                software.last_notified_at.map(|dt| dt.to_rfc3339()),
             ],
         )?;
         Ok(())
@@ -123,7 +160,8 @@ impl Database {
         self.conn.execute(
             "UPDATE softwares SET name = ?2, source_type = ?3, source_identifier = ?4,
              local_command = ?5, local_version_arg = ?6, latest_version = ?7, local_version = ?8,
-             published_at = ?9, last_checked_at = ?10, enabled = ?11
+             published_at = ?9, last_checked_at = ?10, enabled = ?11,
+             last_notified_version = ?12, last_notified_at = ?13
              WHERE id = ?1",
             params![
                 software.id,
@@ -137,6 +175,8 @@ impl Database {
                 software.published_at.map(|dt| dt.to_rfc3339()),
                 software.last_checked_at.map(|dt| dt.to_rfc3339()),
                 software.enabled as i32,
+                software.last_notified_version,
+                software.last_notified_at.map(|dt| dt.to_rfc3339()),
             ],
         )?;
         Ok(())
@@ -176,6 +216,28 @@ impl Database {
                         _ => ThemeMode::System,
                     };
                 }
+                // 通知配置
+                "notification_enabled" => {
+                    settings.notification.enabled = value == "true";
+                }
+                "notification_major" => {
+                    settings.notification.notify_on_major = value == "true";
+                }
+                "notification_minor" => {
+                    settings.notification.notify_on_minor = value == "true";
+                }
+                "notification_patch" => {
+                    settings.notification.notify_on_patch = value == "true";
+                }
+                "notification_prerelease" => {
+                    settings.notification.notify_on_prerelease = value == "true";
+                }
+                "notification_silent_start" => {
+                    settings.notification.silent_start_hour = value.parse().ok();
+                }
+                "notification_silent_end" => {
+                    settings.notification.silent_end_hour = value.parse().ok();
+                }
                 _ => {}
             }
         }
@@ -203,6 +265,20 @@ impl Database {
 
         if let Some(ref token) = settings.github_token {
             upsert("github_token", token)?;
+        }
+
+        // 通知配置
+        upsert("notification_enabled", &settings.notification.enabled.to_string())?;
+        upsert("notification_major", &settings.notification.notify_on_major.to_string())?;
+        upsert("notification_minor", &settings.notification.notify_on_minor.to_string())?;
+        upsert("notification_patch", &settings.notification.notify_on_patch.to_string())?;
+        upsert("notification_prerelease", &settings.notification.notify_on_prerelease.to_string())?;
+
+        if let Some(hour) = settings.notification.silent_start_hour {
+            upsert("notification_silent_start", &hour.to_string())?;
+        }
+        if let Some(hour) = settings.notification.silent_end_hour {
+            upsert("notification_silent_end", &hour.to_string())?;
         }
 
         Ok(())

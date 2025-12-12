@@ -85,6 +85,12 @@ export function EditSoftwareDialog({
         return "owner/repo (如 facebook/react)";
       case "homebrew":
         return "formula 名称 (如 git)";
+      case "npm":
+        return "包名 (如 react, @types/node)";
+      case "pypi":
+        return "包名 (如 django, requests)";
+      case "cargo":
+        return "crate 名称 (如 tokio, serde)";
     }
   };
 
@@ -121,6 +127,9 @@ export function EditSoftwareDialog({
                 <SelectItem value="github-release">GitHub Release</SelectItem>
                 <SelectItem value="github-tags">GitHub Tags</SelectItem>
                 <SelectItem value="homebrew">Homebrew</SelectItem>
+                <SelectItem value="npm">npm Registry</SelectItem>
+                <SelectItem value="pypi">PyPI</SelectItem>
+                <SelectItem value="cargo">crates.io (Cargo)</SelectItem>
               </SelectContent>
             </Select>
           </div>

@@ -5,7 +5,9 @@ mod cache;
 mod commands;
 mod database;
 mod models;
+mod notification;
 mod services;
+mod version;
 
 use cache::CacheManager;
 use database::Database;
@@ -16,6 +18,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_notification::init())
         .setup(|app| {
             // Get app data directory for database
             let app_data_dir = app

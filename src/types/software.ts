@@ -1,5 +1,11 @@
 // 数据源类型
-export type SourceType = "github-release" | "github-tags" | "homebrew";
+export type SourceType =
+  | "github-release"
+  | "github-tags"
+  | "homebrew"
+  | "npm"
+  | "pypi"
+  | "cargo";
 
 // 数据源配置
 export interface SourceConfig {
@@ -30,6 +36,9 @@ export interface Software {
   // 最后检查时间 (ISO 8601)
   lastCheckedAt: string | null;
   enabled: boolean;
+  // 通知相关字段
+  lastNotifiedVersion: string | null;
+  lastNotifiedAt: string | null;
 }
 
 // 新建/编辑软件表单
@@ -68,6 +77,28 @@ export const THEME_MODE_LABELS: Record<ThemeMode, string> = {
   system: "跟随系统",
 };
 
+// 通知配置
+export interface NotificationConfig {
+  enabled: boolean;
+  notifyOnMajor: boolean;
+  notifyOnMinor: boolean;
+  notifyOnPatch: boolean;
+  notifyOnPrerelease: boolean;
+  silentStartHour: number | null;
+  silentEndHour: number | null;
+}
+
+// 默认通知配置
+export const DEFAULT_NOTIFICATION_CONFIG: NotificationConfig = {
+  enabled: true,
+  notifyOnMajor: true,
+  notifyOnMinor: true,
+  notifyOnPatch: false,
+  notifyOnPrerelease: false,
+  silentStartHour: 22,
+  silentEndHour: 8,
+};
+
 // 应用设置
 export interface AppSettings {
   cache: CacheConfig;
@@ -75,6 +106,8 @@ export interface AppSettings {
   githubToken?: string;
   // 主题模式
   theme: ThemeMode;
+  // 通知配置
+  notification: NotificationConfig;
 }
 
 // 更新状态
@@ -102,4 +135,7 @@ export const SOURCE_TYPE_LABELS: Record<SourceType, string> = {
   "github-release": "GitHub Release",
   "github-tags": "GitHub Tags",
   homebrew: "Homebrew",
+  npm: "npm Registry",
+  pypi: "PyPI",
+  cargo: "crates.io (Cargo)",
 };

@@ -65,6 +65,7 @@ export function SettingsDialog({
         },
         githubToken: githubToken || undefined,
         theme,
+        notification: settings.notification,
       });
       onOpenChange(false);
     } catch (error) {

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 import type { AppSettings, CacheConfig } from "@/types/software";
+import { DEFAULT_NOTIFICATION_CONFIG } from "@/types/software";
 
 interface SettingsState {
   settings: AppSettings;
@@ -23,6 +24,7 @@ const defaultSettings: AppSettings = {
   },
   githubToken: undefined,
   theme: "system",
+  notification: DEFAULT_NOTIFICATION_CONFIG,
 };
 
 export const useSettingsStore = create<SettingsState>((set) => ({
