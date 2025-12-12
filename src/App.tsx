@@ -17,6 +17,7 @@ function App() {
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
   const [editingSoftware, setEditingSoftware] = useState<Software | null>(null);
   const [refreshingId, setRefreshingId] = useState<string | null>(null);
+  const [, setTick] = useState(0);
 
   const {
     softwares,
@@ -36,6 +37,12 @@ function App() {
     saveSettings,
     clearCache,
   } = useSettingsStore();
+
+  // Auto refresh fromNow display every 10 seconds
+  useEffect(() => {
+    const interval = setInterval(() => setTick((t) => t + 1), 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Apply theme mode
   useEffect(() => {
