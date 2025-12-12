@@ -17,7 +17,7 @@ import {
 import { VersionBadge } from "./VersionBadge";
 import { fromNow } from "@/lib/time";
 import type { Software } from "@/types/software";
-import { getUpdateStatus, SOURCE_TYPE_LABELS } from "@/types/software";
+import { getUpdateStatus } from "@/types/software";
 
 interface SoftwareTableProps {
   softwares: Software[];
@@ -48,7 +48,6 @@ export function SoftwareTable({
       <TableHeader>
         <TableRow>
           <TableHead className="w-[200px]">名称</TableHead>
-          <TableHead>数据源</TableHead>
           <TableHead>最新版本</TableHead>
           <TableHead>更新时间</TableHead>
           <TableHead>本地版本</TableHead>
@@ -57,7 +56,13 @@ export function SoftwareTable({
         </TableRow>
       </TableHeader>
       <TableBody>
-        {softwares.map((software) => {
+        {[...softwares]
+          .sort((a, b) => {
+            const dateA = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
+            const dateB = b.publishedAt ? new Date(b.publishedAt).getTime() : 0;
+            return dateB - dateA;
+          })
+          .map((software) => {
           const status = getUpdateStatus(
             software.latestVersion,
             software.localVersion
@@ -65,9 +70,6 @@ export function SoftwareTable({
           return (
             <TableRow key={software.id}>
               <TableCell className="font-medium">{software.name}</TableCell>
-              <TableCell className="text-muted-foreground">
-                {SOURCE_TYPE_LABELS[software.source.type]}
-              </TableCell>
               <TableCell>{software.latestVersion || "-"}</TableCell>
               <TableCell className="text-muted-foreground">
                 {fromNow(software.publishedAt)}
