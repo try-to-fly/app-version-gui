@@ -1,50 +1,224 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import { invoke } from "@tauri-apps/api/core";
-import "./App.css";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { Header } from "@/components/layout/Header";
+import { SoftwareTable } from "@/components/software/SoftwareTable";
+import { AddSoftwareDialog } from "@/components/software/AddSoftwareDialog";
+import { EditSoftwareDialog } from "@/components/software/EditSoftwareDialog";
+import { SettingsDialog } from "@/components/settings/SettingsDialog";
+import { Toaster, toast } from "@/components/ui/sonner";
+import { useSoftwareStore } from "@/stores/softwareStore";
+import { useSettingsStore } from "@/stores/settingsStore";
+import { fromNow } from "@/lib/time";
+import type { Software, SoftwareFormData } from "@/types/software";
 
 function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
+  const [editingSoftware, setEditingSoftware] = useState<Software | null>(null);
+  const [refreshingId, setRefreshingId] = useState<string | null>(null);
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
-  }
+  const {
+    softwares,
+    isLoading,
+    isChecking,
+    fetchSoftwares,
+    addSoftware,
+    updateSoftware,
+    deleteSoftware,
+    checkVersion,
+    checkAllVersions,
+  } = useSoftwareStore();
+
+  const {
+    settings,
+    fetchSettings,
+    saveSettings,
+    clearCache,
+  } = useSettingsStore();
+
+  const autoRefreshRef = useRef<number | null>(null);
+
+  // Initial data fetch
+  useEffect(() => {
+    fetchSoftwares();
+    fetchSettings();
+  }, [fetchSoftwares, fetchSettings]);
+
+  // Auto refresh
+  useEffect(() => {
+    if (settings.cache.autoRefreshEnabled && settings.cache.autoRefreshInterval > 0) {
+      const interval = settings.cache.autoRefreshInterval * 60 * 1000;
+      autoRefreshRef.current = window.setInterval(() => {
+        checkAllVersions().catch(console.error);
+      }, interval);
+
+      return () => {
+        if (autoRefreshRef.current) {
+          clearInterval(autoRefreshRef.current);
+        }
+      };
+    }
+  }, [settings.cache.autoRefreshEnabled, settings.cache.autoRefreshInterval, checkAllVersions]);
+
+  const handleAddSoftware = useCallback(
+    async (form: SoftwareFormData) => {
+      try {
+        await addSoftware(form);
+        toast.success("添加成功", { description: `已添加 ${form.name}` });
+      } catch (error) {
+        toast.error("添加失败", { description: String(error) });
+        throw error;
+      }
+    },
+    [addSoftware]
+  );
+
+  const handleUpdateSoftware = useCallback(
+    async (id: string, form: SoftwareFormData) => {
+      try {
+        await updateSoftware(id, form);
+        toast.success("更新成功", { description: `已更新 ${form.name}` });
+      } catch (error) {
+        toast.error("更新失败", { description: String(error) });
+        throw error;
+      }
+    },
+    [updateSoftware]
+  );
+
+  const handleDeleteSoftware = useCallback(
+    async (id: string) => {
+      const software = softwares.find((s) => s.id === id);
+      if (!software) return;
+
+      if (!window.confirm(`确定要删除 "${software.name}" 吗？`)) return;
+
+      try {
+        await deleteSoftware(id);
+        toast.success("删除成功", { description: `已删除 ${software.name}` });
+      } catch (error) {
+        toast.error("删除失败", { description: String(error) });
+      }
+    },
+    [softwares, deleteSoftware]
+  );
+
+  const handleRefresh = useCallback(
+    async (id: string) => {
+      setRefreshingId(id);
+      try {
+        await checkVersion(id, true);
+        toast.success("刷新成功");
+      } catch (error) {
+        toast.error("刷新失败", { description: String(error) });
+      } finally {
+        setRefreshingId(null);
+      }
+    },
+    [checkVersion]
+  );
+
+  const handleRefreshAll = useCallback(async () => {
+    try {
+      await checkAllVersions();
+      toast.success("刷新成功", { description: "已更新所有软件版本信息" });
+    } catch (error) {
+      toast.error("刷新失败", { description: String(error) });
+    }
+  }, [checkAllVersions]);
+
+  const handleEdit = useCallback((software: Software) => {
+    setEditingSoftware(software);
+    setEditDialogOpen(true);
+  }, []);
+
+  const handleSaveSettings = useCallback(
+    async (newSettings: typeof settings) => {
+      try {
+        await saveSettings(newSettings);
+        toast.success("设置已保存");
+      } catch (error) {
+        toast.error("保存失败", { description: String(error) });
+        throw error;
+      }
+    },
+    [saveSettings]
+  );
+
+  const handleClearCache = useCallback(async () => {
+    try {
+      await clearCache();
+      toast.success("缓存已清除");
+    } catch (error) {
+      toast.error("清除失败", { description: String(error) });
+      throw error;
+    }
+  }, [clearCache]);
+
+  // Find the most recent check time
+  const lastCheckedAt = softwares
+    .filter((s) => s.lastCheckedAt)
+    .sort((a, b) => {
+      const dateA = a.lastCheckedAt ? new Date(a.lastCheckedAt).getTime() : 0;
+      const dateB = b.lastCheckedAt ? new Date(b.lastCheckedAt).getTime() : 0;
+      return dateB - dateA;
+    })[0]?.lastCheckedAt;
 
   return (
-    <main className="container">
-      <h1>Welcome to Tauri + React</h1>
+    <div className="min-h-screen bg-background">
+      <Header
+        onAddClick={() => setAddDialogOpen(true)}
+        onSettingsClick={() => setSettingsDialogOpen(true)}
+        onRefreshClick={handleRefreshAll}
+        isRefreshing={isChecking}
+      />
 
-      <div className="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
+      <main className="container mx-auto py-6 px-4">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <p className="text-muted-foreground">加载中...</p>
+          </div>
+        ) : (
+          <SoftwareTable
+            softwares={softwares}
+            onRefresh={handleRefresh}
+            onEdit={handleEdit}
+            onDelete={handleDeleteSoftware}
+            isRefreshing={refreshingId}
+          />
+        )}
+      </main>
 
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
-    </main>
+      <footer className="border-t py-3 px-4">
+        <div className="container mx-auto flex items-center justify-between text-sm text-muted-foreground">
+          <span>上次检查: {fromNow(lastCheckedAt)}</span>
+          <span>共 {softwares.length} 个软件</span>
+        </div>
+      </footer>
+
+      <AddSoftwareDialog
+        open={addDialogOpen}
+        onOpenChange={setAddDialogOpen}
+        onSubmit={handleAddSoftware}
+      />
+
+      <EditSoftwareDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        software={editingSoftware}
+        onSubmit={handleUpdateSoftware}
+      />
+
+      <SettingsDialog
+        open={settingsDialogOpen}
+        onOpenChange={setSettingsDialogOpen}
+        settings={settings}
+        onSave={handleSaveSettings}
+        onClearCache={handleClearCache}
+      />
+
+      <Toaster position="bottom-right" />
+    </div>
   );
 }
 
