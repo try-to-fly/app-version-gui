@@ -11,7 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import type { AppSettings } from "@/types/software";
+import type { AppSettings, ThemeColor } from "@/types/software";
+import { THEME_COLOR_LABELS } from "@/types/software";
 
 interface SettingsDialogProps {
   open: boolean;
@@ -20,6 +21,36 @@ interface SettingsDialogProps {
   onSave: (settings: AppSettings) => Promise<void>;
   onClearCache: () => Promise<void>;
 }
+
+const THEME_COLORS: ThemeColor[] = [
+  "zinc",
+  "slate",
+  "stone",
+  "gray",
+  "neutral",
+  "red",
+  "rose",
+  "orange",
+  "green",
+  "blue",
+  "yellow",
+  "violet",
+];
+
+const THEME_COLOR_PREVIEWS: Record<ThemeColor, string> = {
+  zinc: "bg-zinc-900",
+  slate: "bg-slate-500",
+  stone: "bg-stone-500",
+  gray: "bg-gray-500",
+  neutral: "bg-neutral-500",
+  red: "bg-red-500",
+  rose: "bg-rose-500",
+  orange: "bg-orange-500",
+  green: "bg-green-600",
+  blue: "bg-blue-500",
+  yellow: "bg-yellow-500",
+  violet: "bg-violet-500",
+};
 
 export function SettingsDialog({
   open,
@@ -32,6 +63,7 @@ export function SettingsDialog({
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
   const [autoRefreshInterval, setAutoRefreshInterval] = useState(60);
   const [githubToken, setGithubToken] = useState("");
+  const [themeColor, setThemeColor] = useState<ThemeColor>("zinc");
   const [isSaving, setIsSaving] = useState(false);
   const [isClearingCache, setIsClearingCache] = useState(false);
 
@@ -41,6 +73,7 @@ export function SettingsDialog({
       setAutoRefreshEnabled(settings.cache.autoRefreshEnabled);
       setAutoRefreshInterval(settings.cache.autoRefreshInterval);
       setGithubToken(settings.githubToken || "");
+      setThemeColor(settings.themeColor || "zinc");
     }
   }, [settings]);
 
@@ -54,6 +87,7 @@ export function SettingsDialog({
           autoRefreshInterval,
         },
         githubToken: githubToken || undefined,
+        themeColor,
       });
       onOpenChange(false);
     } catch (error) {
@@ -76,14 +110,36 @@ export function SettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px] max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>设置</DialogTitle>
           <DialogDescription>配置应用程序的缓存和 API 设置。</DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
+        <div className="flex-1 overflow-y-auto space-y-6 py-4 pr-2">
           <div className="space-y-4">
+            <h3 className="text-sm font-medium">主题色</h3>
+            <div className="grid grid-cols-6 gap-2">
+              {THEME_COLORS.map((color) => (
+                <button
+                  key={color}
+                  type="button"
+                  onClick={() => setThemeColor(color)}
+                  className={`w-8 h-8 rounded-full ${THEME_COLOR_PREVIEWS[color]} transition-all ${
+                    themeColor === color
+                      ? "ring-2 ring-offset-2 ring-primary"
+                      : "hover:scale-110"
+                  }`}
+                  title={THEME_COLOR_LABELS[color]}
+                />
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              当前主题：{THEME_COLOR_LABELS[themeColor]}
+            </p>
+          </div>
+
+          <div className="space-y-4 border-t pt-4">
             <h3 className="text-sm font-medium">缓存设置</h3>
 
             <div className="space-y-2">

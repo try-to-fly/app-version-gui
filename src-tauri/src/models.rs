@@ -109,11 +109,73 @@ impl Default for CacheConfig {
     }
 }
 
+// 主题色类型
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "kebab-case")]
+pub enum ThemeColor {
+    Zinc,
+    Slate,
+    Stone,
+    Gray,
+    Neutral,
+    Red,
+    Rose,
+    Orange,
+    Green,
+    Blue,
+    Yellow,
+    Violet,
+}
+
+impl Default for ThemeColor {
+    fn default() -> Self {
+        Self::Zinc
+    }
+}
+
+impl ThemeColor {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ThemeColor::Zinc => "zinc",
+            ThemeColor::Slate => "slate",
+            ThemeColor::Stone => "stone",
+            ThemeColor::Gray => "gray",
+            ThemeColor::Neutral => "neutral",
+            ThemeColor::Red => "red",
+            ThemeColor::Rose => "rose",
+            ThemeColor::Orange => "orange",
+            ThemeColor::Green => "green",
+            ThemeColor::Blue => "blue",
+            ThemeColor::Yellow => "yellow",
+            ThemeColor::Violet => "violet",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s {
+            "zinc" => Some(ThemeColor::Zinc),
+            "slate" => Some(ThemeColor::Slate),
+            "stone" => Some(ThemeColor::Stone),
+            "gray" => Some(ThemeColor::Gray),
+            "neutral" => Some(ThemeColor::Neutral),
+            "red" => Some(ThemeColor::Red),
+            "rose" => Some(ThemeColor::Rose),
+            "orange" => Some(ThemeColor::Orange),
+            "green" => Some(ThemeColor::Green),
+            "blue" => Some(ThemeColor::Blue),
+            "yellow" => Some(ThemeColor::Yellow),
+            "violet" => Some(ThemeColor::Violet),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppSettings {
     pub cache: CacheConfig,
     pub github_token: Option<String>,
+    pub theme_color: ThemeColor,
 }
 
 impl Default for AppSettings {
@@ -121,6 +183,7 @@ impl Default for AppSettings {
         Self {
             cache: CacheConfig::default(),
             github_token: None,
+            theme_color: ThemeColor::default(),
         }
     }
 }

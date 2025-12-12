@@ -58,11 +58,44 @@ export interface CacheConfig {
   autoRefreshInterval: number;
 }
 
+// 主题色类型
+export type ThemeColor =
+  | "zinc"
+  | "slate"
+  | "stone"
+  | "gray"
+  | "neutral"
+  | "red"
+  | "rose"
+  | "orange"
+  | "green"
+  | "blue"
+  | "yellow"
+  | "violet";
+
+// 主题色显示名称
+export const THEME_COLOR_LABELS: Record<ThemeColor, string> = {
+  zinc: "Zinc",
+  slate: "Slate",
+  stone: "Stone",
+  gray: "Gray",
+  neutral: "Neutral",
+  red: "Red",
+  rose: "Rose",
+  orange: "Orange",
+  green: "Green",
+  blue: "Blue",
+  yellow: "Yellow",
+  violet: "Violet",
+};
+
 // 应用设置
 export interface AppSettings {
   cache: CacheConfig;
   // 可选的 GitHub Token（提高 API 限额）
   githubToken?: string;
+  // 主题色
+  themeColor: ThemeColor;
 }
 
 // 更新状态

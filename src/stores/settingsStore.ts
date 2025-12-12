@@ -22,6 +22,7 @@ const defaultSettings: AppSettings = {
     autoRefreshInterval: 60,
   },
   githubToken: undefined,
+  themeColor: "zinc",
 };
 
 export const useSettingsStore = create<SettingsState>((set) => ({

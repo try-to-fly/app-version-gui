@@ -38,6 +38,11 @@ function App() {
 
   const autoRefreshRef = useRef<number | null>(null);
 
+  // Apply theme color
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", settings.themeColor);
+  }, [settings.themeColor]);
+
   // Initial data fetch
   useEffect(() => {
     fetchSoftwares();
@@ -62,15 +67,34 @@ function App() {
 
   const handleAddSoftware = useCallback(
     async (form: SoftwareFormData) => {
+      // Check for duplicate
+      const exists = softwares.some(
+        (s) =>
+          s.source.type === form.source.type &&
+          s.source.identifier.toLowerCase() === form.source.identifier.toLowerCase()
+      );
+      if (exists) {
+        toast.error("添加失败", { description: "该软件已存在，请勿重复添加" });
+        throw new Error("软件已存在");
+      }
+
       try {
-        await addSoftware(form);
+        const software = await addSoftware(form);
         toast.success("添加成功", { description: `已添加 ${form.name}` });
+
+        // Check version immediately after adding
+        try {
+          await checkVersion(software.id, true);
+          toast.success("版本信息已更新");
+        } catch (versionError) {
+          console.error("Failed to check version:", versionError);
+        }
       } catch (error) {
         toast.error("添加失败", { description: String(error) });
         throw error;
       }
     },
-    [addSoftware]
+    [addSoftware, checkVersion, softwares]
   );
 
   const handleUpdateSoftware = useCallback(

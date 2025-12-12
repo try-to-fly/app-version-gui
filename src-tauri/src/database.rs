@@ -3,7 +3,7 @@ use rusqlite::{params, Connection, Result};
 use std::path::Path;
 use std::sync::Mutex;
 
-use crate::models::{AppSettings, CacheConfig, LocalVersionConfig, Software, SourceConfig, SourceType};
+use crate::models::{AppSettings, CacheConfig, LocalVersionConfig, Software, SourceConfig, SourceType, ThemeColor};
 
 pub struct Database {
     conn: Connection,
@@ -169,6 +169,9 @@ impl Database {
                 "github_token" => {
                     settings.github_token = Some(value);
                 }
+                "theme_color" => {
+                    settings.theme_color = ThemeColor::from_str(&value).unwrap_or_default();
+                }
                 _ => {}
             }
         }
@@ -188,6 +191,7 @@ impl Database {
         upsert("cache_ttl_minutes", &settings.cache.ttl_minutes.to_string())?;
         upsert("auto_refresh_enabled", &settings.cache.auto_refresh_enabled.to_string())?;
         upsert("auto_refresh_interval", &settings.cache.auto_refresh_interval.to_string())?;
+        upsert("theme_color", settings.theme_color.as_str())?;
 
         if let Some(ref token) = settings.github_token {
             upsert("github_token", token)?;
