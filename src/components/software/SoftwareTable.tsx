@@ -92,8 +92,38 @@ export function SoftwareTable({
           );
           return (
             <TableRow key={software.id}>
-              <TableCell className="font-medium">{software.name}</TableCell>
-              <TableCell>{software.latestVersion || "-"}</TableCell>
+              <TableCell className="font-medium">
+                {software.source.type.startsWith("github") ? (
+                  <a
+                    href={`https://github.com/${software.source.identifier}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline dark:text-blue-400"
+                  >
+                    {software.name}
+                  </a>
+                ) : (
+                  software.name
+                )}
+              </TableCell>
+              <TableCell>
+                {software.latestVersion ? (
+                  software.source.type === "github-release" ? (
+                    <a
+                      href={`https://github.com/${software.source.identifier}/releases/tag/${software.latestVersion}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline dark:text-blue-400"
+                    >
+                      {software.latestVersion}
+                    </a>
+                  ) : (
+                    software.latestVersion
+                  )
+                ) : (
+                  "-"
+                )}
+              </TableCell>
               <TableCell className="text-muted-foreground">
                 {fromNow(software.publishedAt)}
               </TableCell>
