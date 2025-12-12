@@ -16,21 +16,52 @@ pub async fn get_all_softwares(db: State<'_, DbState>) -> Result<Vec<Software>, 
 }
 
 #[tauri::command]
-pub async fn add_software(form: SoftwareFormData, db: State<'_, DbState>) -> Result<Software, String> {
+pub async fn add_software(
+    form: SoftwareFormData,
+    db: State<'_, DbState>,
+    cache: State<'_, CacheState>,
+    settings: State<'_, AppSettings>,
+) -> Result<Software, String> {
+    // 1. 先尝试获取版本信息（验证数据源有效性）
+    let github_token = settings.github_token.as_deref();
+    let (latest_version, published_at) = match form.source.source_type {
+        SourceType::GithubRelease => {
+            github::get_latest_release(&form.source.identifier, github_token).await?
+        }
+        SourceType::GithubTags => {
+            github::get_latest_tag(&form.source.identifier, github_token).await?
+        }
+        SourceType::Homebrew => {
+            let version = homebrew::get_version(&form.source.identifier).await?;
+            (version, None)
+        }
+    };
+
+    // 2. 获取本地版本（如果配置了）
+    let local_version = form.local_version_config.as_ref().and_then(|config| {
+        local_version::get_version(&config.command, config.version_arg.as_deref()).ok()
+    });
+
+    // 3. 版本获取成功，创建软件记录
     let software = Software {
         id: Uuid::new_v4().to_string(),
         name: form.name,
         source: form.source,
         local_version_config: form.local_version_config,
-        latest_version: None,
-        local_version: None,
-        published_at: None,
-        last_checked_at: None,
+        latest_version: Some(latest_version.clone()),
+        local_version,
+        published_at,
+        last_checked_at: Some(Utc::now()),
         enabled: true,
     };
 
+    // 4. 插入数据库
     let db = db.lock().map_err(|e| e.to_string())?;
     db.insert_software(&software).map_err(|e| e.to_string())?;
+
+    // 5. 更新缓存
+    cache.set(&software.id, latest_version, published_at);
+
     Ok(software)
 }
 

@@ -82,7 +82,7 @@ function App() {
 
   const handleAddSoftware = useCallback(
     async (form: SoftwareFormData) => {
-      // Check for duplicate
+      // 检查重复
       const exists = softwares.some(
         (s) =>
           s.source.type === form.source.type &&
@@ -93,23 +93,11 @@ function App() {
         throw new Error("软件已存在");
       }
 
-      try {
-        const software = await addSoftware(form);
-        toast.success("添加成功", { description: `已添加 ${form.name}` });
-
-        // Check version immediately after adding
-        try {
-          await checkVersion(software.id, true);
-          toast.success("版本信息已更新");
-        } catch (versionError) {
-          console.error("Failed to check version:", versionError);
-        }
-      } catch (error) {
-        toast.error("添加失败", { description: String(error) });
-        throw error;
-      }
+      // 后端会先验证版本获取，成功才添加
+      await addSoftware(form);
+      toast.success("添加成功", { description: `已添加 ${form.name}` });
     },
-    [addSoftware, checkVersion, softwares]
+    [addSoftware, softwares]
   );
 
   const handleUpdateSoftware = useCallback(
