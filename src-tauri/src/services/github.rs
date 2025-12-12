@@ -9,8 +9,29 @@ struct GithubRelease {
 }
 
 #[derive(Deserialize)]
+struct GithubTagCommit {
+    sha: String,
+}
+
+#[derive(Deserialize)]
 struct GithubTag {
     name: String,
+    commit: GithubTagCommit,
+}
+
+#[derive(Deserialize)]
+struct GithubCommitAuthor {
+    date: String,
+}
+
+#[derive(Deserialize)]
+struct GithubCommitDetail {
+    author: GithubCommitAuthor,
+}
+
+#[derive(Deserialize)]
+struct GithubCommit {
+    commit: GithubCommitDetail,
 }
 
 pub async fn get_latest_release(
@@ -69,5 +90,33 @@ pub async fn get_latest_tag(
     let tags: Vec<GithubTag> = response.json().await.map_err(|e| e.to_string())?;
 
     let latest = tags.first().ok_or("No tags found")?;
-    Ok((latest.name.clone(), None))
+
+    // 获取 commit 信息来得到 tag 创建时间
+    let commit_url = format!(
+        "https://api.github.com/repos/{}/commits/{}",
+        repo, latest.commit.sha
+    );
+
+    let mut commit_request = client
+        .get(&commit_url)
+        .header("User-Agent", "app-version-gui")
+        .header("Accept", "application/vnd.github.v3+json");
+
+    if let Some(token) = token {
+        commit_request = commit_request.header("Authorization", format!("Bearer {}", token));
+    }
+
+    let created_at = match commit_request.send().await {
+        Ok(response) if response.status().is_success() => {
+            match response.json::<GithubCommit>().await {
+                Ok(commit) => DateTime::parse_from_rfc3339(&commit.commit.author.date)
+                    .ok()
+                    .map(|dt| dt.with_timezone(&Utc)),
+                Err(_) => None,
+            }
+        }
+        _ => None,
+    };
+
+    Ok((latest.name.clone(), created_at))
 }
