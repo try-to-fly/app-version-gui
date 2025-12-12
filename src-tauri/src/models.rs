@@ -158,6 +158,8 @@ pub struct NotificationConfig {
     pub silent_start_hour: Option<u8>,
     /// 静默时段结束小时 (0-23)
     pub silent_end_hour: Option<u8>,
+    /// 测试模式：即使没有更新也发送通知
+    pub test_mode: bool,
 }
 
 impl Default for NotificationConfig {
@@ -170,6 +172,7 @@ impl Default for NotificationConfig {
             notify_on_prerelease: false,
             silent_start_hour: Some(22),
             silent_end_hour: Some(8),
+            test_mode: false,
         }
     }
 }

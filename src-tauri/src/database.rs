@@ -238,6 +238,9 @@ impl Database {
                 "notification_silent_end" => {
                     settings.notification.silent_end_hour = value.parse().ok();
                 }
+                "notification_test_mode" => {
+                    settings.notification.test_mode = value == "true";
+                }
                 _ => {}
             }
         }
@@ -280,6 +283,7 @@ impl Database {
         if let Some(hour) = settings.notification.silent_end_hour {
             upsert("notification_silent_end", &hour.to_string())?;
         }
+        upsert("notification_test_mode", &settings.notification.test_mode.to_string())?;
 
         Ok(())
     }

@@ -9,6 +9,7 @@ use crate::models::{AppSettings, VersionCheckResult};
 use crate::version::comparator;
 use crate::services::{cargo, github, homebrew, local_version, npm, pypi};
 use crate::models::SourceType;
+use crate::notification::manager::{should_notify, send_notification};
 use chrono::Utc;
 use tokio::sync::Semaphore;
 
@@ -193,6 +194,48 @@ async fn perform_version_check(app_handle: &AppHandle) -> Result<Vec<VersionChec
                 software.published_at = result.published_at;
                 software.last_checked_at = Some(Utc::now());
                 let _ = db.update_software(&software);
+            }
+        }
+    }
+
+    // 发送通知
+    let notification_config = &settings.notification;
+    if notification_config.enabled || notification_config.test_mode {
+        let db = db.lock().map_err(|e| e.to_string())?;
+        for result in &all_results {
+            // 测试模式下对所有软件发送通知，正常模式下仅对有更新的软件发送
+            if !notification_config.test_mode && !result.has_update {
+                continue;
+            }
+
+            if let Ok(Some(mut software)) = db.get_software(&result.software_id) {
+                let decision = should_notify(notification_config, &software, &result.latest_version);
+
+                if decision.should_notify {
+                    println!(
+                        "[Scheduler] Sending notification for {}: {} (reason: {})",
+                        software.name, result.latest_version, decision.reason
+                    );
+
+                    if let Err(e) = send_notification(
+                        app_handle,
+                        &software.name,
+                        &result.latest_version,
+                        result.local_version.as_deref(),
+                    ) {
+                        eprintln!("[Scheduler] Failed to send notification: {}", e);
+                    } else {
+                        // 更新通知记录
+                        software.last_notified_version = Some(result.latest_version.clone());
+                        software.last_notified_at = Some(Utc::now());
+                        let _ = db.update_software(&software);
+                    }
+                } else {
+                    println!(
+                        "[Scheduler] Skip notification for {}: {}",
+                        software.name, decision.reason
+                    );
+                }
             }
         }
     }

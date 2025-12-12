@@ -86,6 +86,7 @@ export interface NotificationConfig {
   notifyOnPrerelease: boolean;
   silentStartHour: number | null;
   silentEndHour: number | null;
+  testMode: boolean;
 }
 
 // 默认通知配置
@@ -97,6 +98,7 @@ export const DEFAULT_NOTIFICATION_CONFIG: NotificationConfig = {
   notifyOnPrerelease: false,
   silentStartHour: 22,
   silentEndHour: 8,
+  testMode: false,
 };
 
 // 应用设置

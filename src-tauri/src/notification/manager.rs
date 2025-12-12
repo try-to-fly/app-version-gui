@@ -15,6 +15,14 @@ pub fn should_notify(
     software: &Software,
     new_version: &str,
 ) -> NotificationDecision {
+    // 测试模式：跳过所有检查（包括静默时段），直接发送通知
+    if config.test_mode {
+        return NotificationDecision {
+            should_notify: true,
+            reason: "测试模式".to_string(),
+        };
+    }
+
     // 检查是否启用通知
     if !config.enabled {
         return NotificationDecision {
@@ -173,6 +181,7 @@ mod tests {
             notify_on_prerelease: false,
             silent_start_hour: None,
             silent_end_hour: None,
+            test_mode: false,
         }
     }
 

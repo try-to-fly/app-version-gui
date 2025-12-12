@@ -11,9 +11,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import type { AppSettings, ThemeMode } from "@/types/software";
-import { THEME_MODE_LABELS } from "@/types/software";
-import { Sun, Moon, Monitor } from "lucide-react";
+import type { AppSettings, ThemeMode, NotificationConfig } from "@/types/software";
+import { THEME_MODE_LABELS, DEFAULT_NOTIFICATION_CONFIG } from "@/types/software";
+import { Sun, Moon, Monitor, Bell, AlertTriangle } from "lucide-react";
 
 interface SettingsDialogProps {
   open: boolean;
@@ -41,6 +41,7 @@ export function SettingsDialog({
   const [autoRefreshInterval, setAutoRefreshInterval] = useState(60);
   const [githubToken, setGithubToken] = useState("");
   const [theme, setTheme] = useState<ThemeMode>("system");
+  const [notification, setNotification] = useState<NotificationConfig>(DEFAULT_NOTIFICATION_CONFIG);
   const [isSaving, setIsSaving] = useState(false);
   const [isClearingCache, setIsClearingCache] = useState(false);
 
@@ -51,6 +52,7 @@ export function SettingsDialog({
       setAutoRefreshInterval(settings.cache.autoRefreshInterval);
       setGithubToken(settings.githubToken || "");
       setTheme(settings.theme || "system");
+      setNotification(settings.notification || DEFAULT_NOTIFICATION_CONFIG);
     }
   }, [settings]);
 
@@ -65,7 +67,7 @@ export function SettingsDialog({
         },
         githubToken: githubToken || undefined,
         theme,
-        notification: settings.notification,
+        notification,
       });
       onOpenChange(false);
     } catch (error) {
@@ -188,6 +190,152 @@ export function SettingsDialog({
                 配置 Token 可将 API 限额从 60 次/小时提升至 5000 次/小时
               </p>
             </div>
+          </div>
+
+          <div className="space-y-4 border-t pt-4">
+            <h3 className="text-sm font-medium flex items-center gap-2">
+              <Bell className="w-4 h-4" />
+              通知设置
+            </h3>
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="notificationEnabled">启用通知</Label>
+                <p className="text-xs text-muted-foreground">
+                  检测到新版本时发送系统通知
+                </p>
+              </div>
+              <Switch
+                id="notificationEnabled"
+                checked={notification.enabled}
+                onCheckedChange={(checked) =>
+                  setNotification((prev) => ({ ...prev, enabled: checked }))
+                }
+              />
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="testMode" className="flex items-center gap-1">
+                  测试模式
+                  <AlertTriangle className="w-3 h-3 text-yellow-500" />
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  即使没有更新也发送通知（用于测试）
+                </p>
+              </div>
+              <Switch
+                id="testMode"
+                checked={notification.testMode}
+                onCheckedChange={(checked) =>
+                  setNotification((prev) => ({ ...prev, testMode: checked }))
+                }
+              />
+            </div>
+
+            {notification.testMode && (
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-md p-3">
+                <p className="text-xs text-yellow-700 dark:text-yellow-300 flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" />
+                  测试模式已开启，每次后台检查都会发送通知，请在测试完成后关闭
+                </p>
+              </div>
+            )}
+
+            {notification.enabled && (
+              <>
+                <div className="space-y-3 pl-2 border-l-2 border-muted">
+                  <p className="text-xs text-muted-foreground">通知版本类型：</p>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="notifyMajor" className="text-sm font-normal">
+                      主版本更新 (如 1.0 → 2.0)
+                    </Label>
+                    <Switch
+                      id="notifyMajor"
+                      checked={notification.notifyOnMajor}
+                      onCheckedChange={(checked) =>
+                        setNotification((prev) => ({ ...prev, notifyOnMajor: checked }))
+                      }
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="notifyMinor" className="text-sm font-normal">
+                      次版本更新 (如 1.0 → 1.1)
+                    </Label>
+                    <Switch
+                      id="notifyMinor"
+                      checked={notification.notifyOnMinor}
+                      onCheckedChange={(checked) =>
+                        setNotification((prev) => ({ ...prev, notifyOnMinor: checked }))
+                      }
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="notifyPatch" className="text-sm font-normal">
+                      补丁版本更新 (如 1.0.0 → 1.0.1)
+                    </Label>
+                    <Switch
+                      id="notifyPatch"
+                      checked={notification.notifyOnPatch}
+                      onCheckedChange={(checked) =>
+                        setNotification((prev) => ({ ...prev, notifyOnPatch: checked }))
+                      }
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="notifyPrerelease" className="text-sm font-normal">
+                      预发布版本 (alpha, beta, rc)
+                    </Label>
+                    <Switch
+                      id="notifyPrerelease"
+                      checked={notification.notifyOnPrerelease}
+                      onCheckedChange={(checked) =>
+                        setNotification((prev) => ({ ...prev, notifyOnPrerelease: checked }))
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>静默时段</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min={0}
+                      max={23}
+                      value={notification.silentStartHour ?? ""}
+                      onChange={(e) =>
+                        setNotification((prev) => ({
+                          ...prev,
+                          silentStartHour: e.target.value ? Number(e.target.value) : null,
+                        }))
+                      }
+                      placeholder="22"
+                      className="w-20"
+                    />
+                    <span className="text-sm text-muted-foreground">点 至</span>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={23}
+                      value={notification.silentEndHour ?? ""}
+                      onChange={(e) =>
+                        setNotification((prev) => ({
+                          ...prev,
+                          silentEndHour: e.target.value ? Number(e.target.value) : null,
+                        }))
+                      }
+                      placeholder="8"
+                      className="w-20"
+                    />
+                    <span className="text-sm text-muted-foreground">点</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    在此时段内不发送通知（留空则不限制）
+                  </p>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
